@@ -1,341 +1,331 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import ThemeToggle from "@/components/theme-toggle"
+import { LogIn, UserPlus, Heart } from "lucide-react"
 
 export default function Home() {
 
-  const [anime, setAnime] = useState<any[]>([])
-  const [trending, setTrending] = useState<any[]>([])
-  const [search, setSearch] = useState("")
-  const [visible, setVisible] = useState(60)
-  const [trailer, setTrailer] = useState("")
-  const [genre, setGenre] = useState("")
-  const [heroIndex, setHeroIndex] = useState(0)
+const [anime,setAnime] = useState<any[]>([])
+const [trending,setTrending] = useState<any[]>([])
+const [search,setSearch] = useState("")
+const [results,setResults] = useState<any[]>([])
+const [trailer,setTrailer] = useState("")
+const [watchlist,setWatchlist] = useState<number[]>([])
+const [heroIndex,setHeroIndex] = useState(0)
 
-  const loader = useRef<any>(null)
+useEffect(()=>{
 
-  /* LOAD ANIME */
+async function load(){
 
-  useEffect(() => {
+try{
 
-    async function load() {
+const pages=[1,2,3,4,5]
 
-      try {
+const res = await Promise.all(
+pages.map(p =>
+fetch(`https://api.jikan.moe/v4/anime?page=${p}`)
+.then(r=>r.json())
+)
+)
 
-        const pages = [1,2,3,4,5,6,7,8,9,10]
+const all = res.flatMap(r=>r?.data || [])
 
-        const results = await Promise.all(
-          pages.map(p =>
-            fetch(`https://api.jikan.moe/v4/anime?page=${p}&limit=25`)
-              .then(res => res.json())
-          )
-        )
+const top = await fetch("https://api.jikan.moe/v4/top/anime?limit=10")
+const topData = await top.json()
 
-        const allAnime = results.flatMap(r => r?.data || [])
+setAnime(all.filter(Boolean))
+setTrending(topData?.data || [])
 
-        const resTop = await fetch("https://api.jikan.moe/v4/top/anime?limit=10")
-        const topData = await resTop.json()
+}catch(e){
+console.log(e)
+}
 
-        setAnime(allAnime)
-        setTrending(topData?.data || [])
+}
 
-      } catch (e) {
-        console.log(e)
-      }
+load()
 
-    }
+},[])
 
-    load()
+useEffect(()=>{
 
-  }, [])
+if(!search){
+setResults([])
+return
+}
 
-  /* HERO AUTO CAROUSEL */
+async function searchAnime(){
 
-  useEffect(() => {
+try{
 
-    if (trending.length === 0) return
+const res = await fetch(`https://api.jikan.moe/v4/anime?q=${search}`)
+const data = await res.json()
 
-    const interval = setInterval(() => {
+setResults(data?.data || [])
 
-      setHeroIndex(i => (i + 1) % trending.length)
+}catch(e){
+console.log(e)
+}
 
-    }, 4000)
+}
 
-    return () => clearInterval(interval)
+const delay=setTimeout(searchAnime,400)
+return ()=>clearTimeout(delay)
 
-  }, [trending])
+},[search])
 
-  /* INFINITE SCROLL */
+useEffect(()=>{
 
-  useEffect(() => {
+if(trending.length===0)return
 
-    const observer = new IntersectionObserver(entries => {
+const interval=setInterval(()=>{
+setHeroIndex(i=>(i+1)%trending.length)
+},4000)
 
-      if (entries[0].isIntersecting) {
-        setVisible(v => v + 24)
-      }
+return ()=>clearInterval(interval)
 
-    })
+},[trending])
 
-    if (loader.current) {
-      observer.observe(loader.current)
-    }
+function toggleWatch(id:number){
 
-    return () => observer.disconnect()
+if(watchlist.includes(id)){
+setWatchlist(watchlist.filter(a=>a!==id))
+}else{
+setWatchlist([...watchlist,id])
+}
 
-  }, [])
+}
 
-  /* SAFE GENRES */
+const hero = trending[heroIndex]
 
-  const genres = Array.from(
-    new Set(
-      anime.flatMap((a: any) =>
-        a?.genres?.map((g: any) => g?.name) || []
-      )
-    )
-  )
+const list = search ? results : anime
 
-  /* FILTER */
+return(
 
-  const filtered = anime.filter((a: any) => {
+<main className="bg-black text-white min-h-screen">
 
-    const matchSearch =
-      a?.title?.toLowerCase().includes(search.toLowerCase())
+{/* NAVBAR */}
 
-    const matchGenre =
-      genre === "" ||
-      a?.genres?.some((g: any) => g?.name === genre)
+<div className="sticky top-0 z-50 flex justify-between items-center px-6 py-4 backdrop-blur-lg bg-black/70 border-b border-gray-800">
 
-    return matchSearch && matchGenre
+<h1 className="text-xl md:text-2xl font-bold text-purple-400">
+AnimeVerse
+</h1>
 
-  })
+<div className="flex items-center gap-3">
 
-  const hero = trending[heroIndex]
+<ThemeToggle/>
 
-  return (
+<Link href="/login">
+<button className="flex items-center gap-1 px-3 py-2 bg-gray-800 rounded">
+<LogIn size={16}/> Login
+</button>
+</Link>
 
-    <main className="bg-black text-white min-h-screen">
+<Link href="/signup">
+<button className="flex items-center gap-1 px-3 py-2 bg-purple-600 rounded">
+<UserPlus size={16}/> Sign Up
+</button>
+</Link>
 
-      {/* NAVBAR */}
+</div>
 
-      <div className="sticky top-0 z-50 flex justify-between items-center px-10 py-6 backdrop-blur-lg bg-black/60 border-b border-gray-800">
+</div>
 
-        <h1 className="text-2xl font-bold text-purple-400">
-          AnimeVerse
-        </h1>
+{/* HERO */}
 
-        <div className="flex gap-4 items-center">
+{hero && (
 
-          <p className="text-gray-400 text-sm">
-            Anime Discovery Platform
-          </p>
+<div className="relative h-[300px] md:h-[420px] flex items-end p-6 overflow-hidden">
 
-          <ThemeToggle />
+<img
+src={hero?.images?.jpg?.large_image_url}
+className="absolute inset-0 w-full h-full object-cover opacity-40"
+/>
 
-        </div>
+<div className="relative z-10 max-w-xl">
 
-      </div>
+<h1 className="text-3xl md:text-4xl font-bold mb-3">
+{hero?.title}
+</h1>
 
-      {/* HERO SPOTLIGHT */}
+<p className="text-gray-300 mb-4 text-sm md:text-base">
+{hero?.synopsis?.slice(0,140)}...
+</p>
 
-      {hero && (
+<div className="flex gap-3">
 
-        <div className="relative h-[450px] flex items-end p-10 overflow-hidden">
+<Link href={`/anime/${hero?.mal_id}`}>
+<button className="bg-purple-600 px-5 py-2 rounded">
+View Details
+</button>
+</Link>
 
-          <img
-            src={hero?.images?.jpg?.large_image_url}
-            className="absolute inset-0 w-full h-full object-cover opacity-40"
-          />
+<button
+onClick={()=>setTrailer(hero?.trailer?.embed_url||"")}
+className="bg-gray-800 px-5 py-2 rounded"
+>
+▶ Trailer
+</button>
 
-          <div className="relative z-10 max-w-xl">
+</div>
 
-            <h1 className="text-4xl font-bold mb-4">
-              {hero?.title}
-            </h1>
+</div>
 
-            <p className="text-gray-300 mb-4">
-              {hero?.synopsis?.slice(0,150)}...
-            </p>
+</div>
 
-            <div className="flex gap-4">
+)}
 
-              <Link href={`/anime/${hero?.mal_id}`}>
-                <button className="bg-purple-600 px-6 py-2 rounded-lg">
-                  View Details
-                </button>
-              </Link>
+<div className="p-6">
 
-              <button
-                onClick={() => setTrailer(hero?.trailer?.embed_url || "")}
-                className="bg-gray-800 px-6 py-2 rounded-lg"
-              >
-                ▶ Trailer
-              </button>
+{/* SEARCH */}
 
-            </div>
+<input
+type="text"
+placeholder="Search anime..."
+className="mb-10 p-4 w-full bg-gray-900 rounded-xl border border-gray-700"
+value={search}
+onChange={e=>setSearch(e.target.value)}
+/>
 
-          </div>
+{/* TRENDING */}
 
-        </div>
+<h2 className="text-2xl font-bold mb-4">
+🔥 Trending Anime
+</h2>
 
-      )}
+<div className="flex gap-4 overflow-x-auto pb-6">
 
-      <div className="p-10">
+{trending?.map(a=>{
 
-        {/* SEARCH */}
+if(!a) return null
 
-        <input
-          type="text"
-          placeholder="Search anime..."
-          className="mb-8 p-4 w-full bg-gray-900 rounded-xl border border-gray-700"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+return(
 
-        {/* GENRE FILTER */}
+<div key={a?.mal_id} className="min-w-[160px]">
 
-        <div className="flex flex-wrap gap-3 mb-10">
+<Link href={`/anime/${a?.mal_id}`}>
+<img
+src={a?.images?.jpg?.image_url}
+className="rounded-lg hover:scale-105 transition"
+/>
+</Link>
 
-          <button
-            onClick={() => setGenre("")}
-            className={`px-4 py-2 rounded-full ${genre === "" ? "bg-purple-600" : "bg-gray-800"}`}
-          >
-            All
-          </button>
+<p className="text-sm mt-1">{a?.title}</p>
 
-          {genres.map((g: any) => (
-            <button
-              key={g}
-              onClick={() => setGenre(g)}
-              className={`px-4 py-2 rounded-full ${genre === g ? "bg-purple-600" : "bg-gray-800"}`}
-            >
-              {g}
-            </button>
-          ))}
+</div>
 
-        </div>
+)
 
-        {/* TRENDING ROW */}
+})}
 
-        <h2 className="text-2xl font-bold mb-6">
-          🔥 Trending Anime
-        </h2>
+</div>
 
-        <div className="flex gap-6 overflow-x-auto pb-10">
+{/* GRID */}
 
-          {trending.map((a: any) => (
+<h2 className="text-2xl font-bold mb-6">
 
-            <div key={a?.mal_id} className="min-w-[200px]">
+{search ? "🔎 Search Results" : "📺 All Anime"}
 
-              <Link href={`/anime/${a?.mal_id}`}>
-                <img
-                  src={a?.images?.jpg?.image_url}
-                  className="rounded-xl hover:scale-105 transition"
-                />
-              </Link>
+</h2>
 
-              <p className="mt-2 text-sm font-semibold">
-                {a?.title}
-              </p>
+<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
 
-            </div>
+{list?.map(a=>{
 
-          ))}
+if(!a || !a.mal_id) return null
 
-        </div>
+return(
 
-        {/* ALL ANIME */}
+<div
+key={a?.mal_id}
+className="relative bg-gray-900 rounded-lg overflow-hidden hover:scale-105 transition"
+>
 
-        <h2 className="text-2xl font-bold mb-6">
-          📺 All Anime
-        </h2>
+<Link href={`/anime/${a?.mal_id}`}>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+<img
+src={a?.images?.jpg?.image_url}
+className="w-full h-[250px] object-cover"
+/>
 
-          {filtered.slice(0, visible).map((a: any) => (
+</Link>
 
-            <div
-              key={a?.mal_id}
-              className="bg-gray-900 p-4 rounded-xl hover:scale-105 hover:shadow-purple-500/40 hover:shadow-xl transition"
-            >
+<div className="p-3">
 
-              <div className="relative">
+<h2 className="text-xs md:text-sm font-semibold">
+{a?.title}
+</h2>
 
-                <Link href={`/anime/${a?.mal_id}`}>
-                  <img
-                    src={a?.images?.jpg?.image_url}
-                    className="rounded-lg mb-3"
-                  />
-                </Link>
+<p className="text-yellow-400 text-xs">
+⭐ {a?.score ?? "N/A"}
+</p>
 
-                <button
-                  onClick={() => setTrailer(a?.trailer?.embed_url || "")}
-                  className="absolute bottom-2 right-2 bg-black/70 px-3 py-1 rounded text-sm"
-                >
-                  ▶
-                </button>
+</div>
 
-              </div>
+<button
+onClick={()=>toggleWatch(a?.mal_id)}
+className="absolute top-2 right-2 bg-black/60 p-1 rounded"
+>
+<Heart
+size={16}
+color={watchlist.includes(a?.mal_id)?"red":"white"}
+/>
+</button>
 
-              <Link href={`/anime/${a?.mal_id}`}>
-                <h2 className="text-sm font-semibold">
-                  {a?.title}
-                </h2>
-              </Link>
+<button
+onClick={()=>setTrailer(a?.trailer?.embed_url||"")}
+className="absolute bottom-2 right-2 bg-black/60 px-2 rounded text-xs"
+>
+▶
+</button>
 
-              <p className="text-yellow-400 text-sm">
-                ⭐ {a?.score ?? "N/A"}
-              </p>
+</div>
 
-            </div>
+)
 
-          ))}
+})}
 
-        </div>
+</div>
 
-        <div ref={loader} className="h-10"></div>
+</div>
 
-      </div>
+{/* TRAILER */}
 
-      {/* TRAILER MODAL */}
+{trailer &&(
 
-      {trailer && (
+<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
 
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+<div className="relative w-[90%] md:w-[800px]">
 
-          <div className="relative w-[90%] md:w-[800px]">
+<button
+onClick={()=>setTrailer("")}
+className="absolute -top-10 right-0 text-white text-3xl"
+>
+✕
+</button>
 
-            <button
-              onClick={() => setTrailer("")}
-              className="absolute -top-10 right-0 text-white text-3xl"
-            >
-              ✕
-            </button>
+<iframe
+src={trailer}
+width="100%"
+height="450"
+allowFullScreen
+className="rounded-xl"
+/>
 
-            <iframe
-              src={trailer}
-              width="100%"
-              height="450"
-              allowFullScreen
-              className="rounded-xl"
-            />
+</div>
 
-          </div>
+</div>
 
-        </div>
+)}
 
-      )}
+<div className="text-center py-8 border-t border-gray-800 text-gray-400">
+AnimeVerse © 2026 • Built with Next.js
+</div>
 
-      {/* FOOTER */}
+</main>
 
-      <div className="text-center py-8 border-t border-gray-800 text-gray-400">
-        AnimeVerse © 2026 • Built with Next.js
-      </div>
-
-    </main>
-
-  )
+)
 
 }
